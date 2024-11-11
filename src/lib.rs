@@ -12,7 +12,21 @@ use crate::bindings::{
 use bindings::wasi::http::outgoing_handler::{handle, OutgoingRequest};
 const HOME: &[u8] = b"
 <html>
-<head><title>Example page</title></head>
+<head>
+<script src=\"https://cdn.tailwindcss.com\">
+</script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {},
+      fontFamily: {
+        sans: [\"Inter var\", \"sans-serif\"],
+        mono: [\"Roboto Mono\", \"monospace\"],
+      },
+  },
+  }
+</script>
+<title>Issue Manager</title></head>
     <body>
     <script type=\"module\">
       async function getIssues() {
@@ -45,9 +59,24 @@ const HOME: &[u8] = b"
 const ISSUE: &[u8] = b"
 <html>
 <head>
-    <title>Example page</title>
+<script src=\"https://cdn.tailwindcss.com\">
+</script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {},
+      fontFamily: {
+        sans: [\"Inter var\", \"sans-serif\"],
+        mono: [\"Roboto Mono\", \"monospace\"],
+      },
+  },
+  }
+</script>
+    <title>Issue</title>
     </head>
     <body>
+    <script src=\"https://cdn.jsdelivr.net/npm/marked/marked.min.js\"></script>
+
     <script type=\"module\">
       const urlParams = new URLSearchParams(window.location.search);
       async function getIssue() {
@@ -59,9 +88,14 @@ const ISSUE: &[u8] = b"
       let h1 = document.createElement(\"h1\");
       h1.textContent = issue.title;
       document.body.appendChild(h1);
-      let body = document.createElement(\"div\");
-      body.textContent = issue.body
-      document.body.appendChild(body);
+      let issueBody = document.createElement(\"div\");
+      issueBody.setAttribute(\"markdown\", \"1\");
+      const issueText = document.createTextNode(issue.body);
+      issueBody.appendChild(issueText);
+
+      console.log(marked.parse(issue.body))
+
+      document.body.appendChild(issueBody);
     </script>
 <div>
 </div>
@@ -71,6 +105,19 @@ const ISSUE: &[u8] = b"
 const CREATE: &[u8] = b"
 <html>
 <head>
+<script src=\"https://cdn.tailwindcss.com\">
+</script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {},
+      fontFamily: {
+        sans: [\"Inter var\", \"sans-serif\"],
+        mono: [\"Roboto Mono\", \"monospace\"],
+      },
+  },
+  }
+</script>
     <title>Create an issue</title>
     </head>
     <body>
@@ -85,12 +132,22 @@ const CREATE: &[u8] = b"
           repo: data.get('repo'),
           owner: data.get('owner'),
           body: data.get('body'),
+          assignee: 'macovedj',
+          assignees: ['macovedj']
         });
         let res = await fetch(`/gh/create`, {
           method: \"POST\",
           headers: { 'Content-Type': 'application/json' },
           body,
         });
+        let resBody = await res.json();
+        let success = document.createElement(\"a\");
+        const linkText = document.createTextNode(\"Successfully created issue\");
+        success.appendChild(linkText);
+        success.href = resBody.html_url;
+        document.body.appendChild(success);
+        console.log({resBody})
+
         return res;
       }
       form.addEventListener(\"submit\", submitHandler);
@@ -330,9 +387,11 @@ impl Guest for Component {
             req.set_authority(Some("api.github.com")).unwrap();
             let body = req.body().unwrap();
             let stream = body.write().unwrap();
+            let md_opt = markdown::Options::gfm();
+            let issue_body = markdown::to_html_with_options(&issue.body, &md_opt).unwrap();
             let to_write = ReqBody {
                 title: issue.title,
-                body: issue.body,
+                body: issue_body,
             };
             stream
                 .blocking_write_and_flush(serde_json::to_string(&to_write).unwrap().as_bytes())
@@ -346,7 +405,6 @@ impl Guest for Component {
             future_res_pollable.block();
 
             let res = future_res.get();
-            // .map_err(|err| anyhow::anyhow!("outgoing response error code: {err:?}"));
             let res = match res.unwrap().unwrap() {
                 Ok(res) => res,
                 Err(err) => {
