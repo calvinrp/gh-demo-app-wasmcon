@@ -13,8 +13,26 @@ use bindings::wasi::http::outgoing_handler::{handle, OutgoingRequest};
 const HOME: &[u8] = b"
 <html>
 <head>
+<script src=\"https://cdn.tailwindcss.com\">
+</script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {},
+      fontFamily: {
+        sans: [\"Inter var\", \"sans-serif\"],
+        mono: [\"Roboto Mono\", \"monospace\"],
+      },
+  },
+  }
+</script>
+<style>
+  body a {
+    color: #7dd3fc;
+  }
+</style>
 <title>Issue Manager</title></head>
-    <body>
+    <body class=\"bg-slate-900 text-white p-5\">
     <script type=\"module\">
       async function getIssues() {
         let res = await fetch(\"/gh\");
@@ -47,9 +65,27 @@ const HOME: &[u8] = b"
 const ISSUE: &[u8] = b"
 <html>
 <head>
+<script src=\"https://cdn.tailwindcss.com\">
+</script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {},
+      fontFamily: {
+        sans: [\"Inter var\", \"sans-serif\"],
+        mono: [\"Roboto Mono\", \"monospace\"],
+      },
+  },
+  }
+</script>
+<style>
+  body a {
+    color: #7dd3fc;
+  }
+</style>
     <title>Issue</title>
     </head>
-    <body>
+    <body class=\"bg-slate-900 text-white p-5\">
     <script src=\"https://cdn.jsdelivr.net/npm/marked/marked.min.js\"></script>
 
     <script type=\"module\">
@@ -80,9 +116,41 @@ const ISSUE: &[u8] = b"
 const CREATE: &[u8] = b"
 <html>
 <head>
+<script src=\"https://cdn.tailwindcss.com\">
+</script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {},
+      fontFamily: {
+        sans: [\"Inter var\", \"sans-serif\"],
+        mono: [\"Roboto Mono\", \"monospace\"],
+      },
+  },
+  }
+</script>
+<style>
+  body a {
+    color: #7dd3fc;
+  }
+
+  body form {
+    border-radius: .5rem;
+    background-color: #1e293b;
+  }
+  body input {
+    border-radius: .5rem;
+    background-color: #334155;
+  }
+  body textarea {
+    border-radius: .5rem;
+    background-color: #334155;
+    box-sizing: border-box;
+  }
+</style>
     <title>Create an issue</title>
     </head>
-    <body>
+    <body class=\"bg-slate-900 text-white p-5\">
     <script type=\"module\">
       const urlParams = new URLSearchParams(window.location.search);
       const form = document.getElementById(\"form\");
@@ -116,10 +184,16 @@ const CREATE: &[u8] = b"
 <div>
 <form id=\"form\">
   <label for=\"title\">Issue Title</label>
+  <div>
   <input type=\"text\" id=\"title\" name=\"title\"><br><br>
-  <label for=\"body\">Issue Body:</label>
+  </div>
+  <label for=\"body\">Issue Body</label>
+  <div>
   <textarea id=\"issue-body\" name=\"body\", rows=\"4\" cols=\"50\">Write your issue here</textarea>
+  </div>
+  <div>
   <input  type=\"submit\" value=\"Submit\">
+  </div>
 </form>
 </div>
 <a href=\"/\">Back to issue list</a>
