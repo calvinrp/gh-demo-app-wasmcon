@@ -13,19 +13,6 @@ use bindings::wasi::http::outgoing_handler::{handle, OutgoingRequest};
 const HOME: &[u8] = b"
 <html>
 <head>
-<script src=\"https://cdn.tailwindcss.com\">
-</script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {},
-      fontFamily: {
-        sans: [\"Inter var\", \"sans-serif\"],
-        mono: [\"Roboto Mono\", \"monospace\"],
-      },
-  },
-  }
-</script>
 <title>Issue Manager</title></head>
     <body>
     <script type=\"module\">
@@ -35,6 +22,7 @@ const HOME: &[u8] = b"
       }
       let issuesRes = await getIssues();
       let issues = await issuesRes.json();
+      console.log()
 
       let ol = document.createElement(\"ol\");
       for (const issue of issues) {
@@ -43,13 +31,13 @@ const HOME: &[u8] = b"
         li.appendChild(a);
         const linkText = document.createTextNode(issue.title);
         a.appendChild(linkText);
-        a.href = `/issue?owner=${issue.repository.owner.login}&repo=${issue.repository.name}&number=${issue.number}`;
+        a.href = `/issue?owner=JAFLabs&repo=issues&number=${issue.number}`;
         ol.appendChild(li);
       }
       document.body.appendChild(ol);
 
     </script>
-    <h1>Home page</h1>
+    <h1>Issue Manager</h1>
     <a href=\"/create\">Create an Issue</a>
     </div>
     </body>
@@ -59,19 +47,6 @@ const HOME: &[u8] = b"
 const ISSUE: &[u8] = b"
 <html>
 <head>
-<script src=\"https://cdn.tailwindcss.com\">
-</script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {},
-      fontFamily: {
-        sans: [\"Inter var\", \"sans-serif\"],
-        mono: [\"Roboto Mono\", \"monospace\"],
-      },
-  },
-  }
-</script>
     <title>Issue</title>
     </head>
     <body>
@@ -89,9 +64,9 @@ const ISSUE: &[u8] = b"
       h1.textContent = issue.title;
       document.body.appendChild(h1);
       let issueBody = document.createElement(\"div\");
-      issueBody.setAttribute(\"markdown\", \"1\");
-      const issueText = document.createTextNode(issue.body);
-      issueBody.appendChild(issueText);
+      // issueBody.setAttribute(\"markdown\", \"1\");
+      issueBody.innerHTML = issue.body;
+      // issueBody.appendChild(issueText);
 
       console.log(marked.parse(issue.body))
 
@@ -105,19 +80,6 @@ const ISSUE: &[u8] = b"
 const CREATE: &[u8] = b"
 <html>
 <head>
-<script src=\"https://cdn.tailwindcss.com\">
-</script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {},
-      fontFamily: {
-        sans: [\"Inter var\", \"sans-serif\"],
-        mono: [\"Roboto Mono\", \"monospace\"],
-      },
-  },
-  }
-</script>
     <title>Create an issue</title>
     </head>
     <body>
@@ -125,22 +87,21 @@ const CREATE: &[u8] = b"
       const urlParams = new URLSearchParams(window.location.search);
       const form = document.getElementById(\"form\");
       async function submitHandler(e) {
+        console.log(\"SUBMITTING\");
         const data = new FormData(e.target);
         e.preventDefault()
         const body = JSON.stringify({
           title: data.get('title'),
-          repo: data.get('repo'),
-          owner: data.get('owner'),
           body: data.get('body'),
-          assignee: 'macovedj',
-          assignees: ['macovedj']
         });
+        console.log({body})
         let res = await fetch(`/gh/create`, {
           method: \"POST\",
           headers: { 'Content-Type': 'application/json' },
           body,
         });
         let resBody = await res.json();
+        console.log({resBody})
         let success = document.createElement(\"a\");
         const linkText = document.createTextNode(\"Successfully created issue\");
         success.appendChild(linkText);
@@ -156,15 +117,12 @@ const CREATE: &[u8] = b"
 <form id=\"form\">
   <label for=\"title\">Issue Title</label>
   <input type=\"text\" id=\"title\" name=\"title\"><br><br>
-  <label for=\"repo\">Repo Name</label>
-  <input type=\"text\" id=\"repo\" name=\"repo\"><br><br>
-  <label for=\"owner\">Repo Owner</label>
-  <input type=\"text\" id=\"owner\" name=\"owner\"><br><br>
   <label for=\"body\">Issue Body:</label>
   <textarea id=\"issue-body\" name=\"body\", rows=\"4\" cols=\"50\">Write your issue here</textarea>
   <input  type=\"submit\" value=\"Submit\">
 </form>
 </div>
+<a href=\"/\">Back to issue list</a>
 </body>
 </html>";
 
@@ -184,8 +142,6 @@ struct Params {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 struct CreateRequest {
-    owner: String,
-    repo: String,
     title: String,
     body: String,
 }
@@ -248,7 +204,8 @@ impl Guest for Component {
             let req = OutgoingRequest::new(fields);
             req.set_method(&Method::Get).unwrap();
             req.set_scheme(Some(&Scheme::Https)).unwrap();
-            req.set_path_with_query(Some("/issues")).unwrap();
+            req.set_path_with_query(Some(&format!("/repos/JAFLabs/issues/issues")))
+                .unwrap();
             req.set_authority(Some("api.github.com")).unwrap();
             let future_res = handle(req, None).expect("future response");
             future_res.subscribe().block();
@@ -352,6 +309,7 @@ impl Guest for Component {
                 }
             }
             let issue = serde_json::from_slice::<CreateRequest>(&bytes).expect("valid JSON");
+            dbg!(&issue);
             let fields = Fields::new();
             fields
                 .set(
@@ -379,11 +337,8 @@ impl Guest for Component {
             let req = OutgoingRequest::new(fields);
             req.set_method(&Method::Post).unwrap();
             req.set_scheme(Some(&Scheme::Https)).unwrap();
-            req.set_path_with_query(Some(&format!(
-                "/repos/{}/{}/issues",
-                issue.owner, issue.repo
-            )))
-            .unwrap();
+            req.set_path_with_query(Some(&format!("/repos/JAFLabs/issues/issues",)))
+                .unwrap();
             req.set_authority(Some("api.github.com")).unwrap();
             let body = req.body().unwrap();
             let stream = body.write().unwrap();
@@ -393,6 +348,7 @@ impl Guest for Component {
                 title: issue.title,
                 body: issue_body,
             };
+            dbg!(&to_write);
             stream
                 .blocking_write_and_flush(serde_json::to_string(&to_write).unwrap().as_bytes())
                 .unwrap();
