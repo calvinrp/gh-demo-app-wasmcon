@@ -7,17 +7,16 @@ use serde::{Deserialize, Serialize};
 use crate::bindings::{
     exports::wasi::http::incoming_handler::{Guest, IncomingRequest, ResponseOutparam},
     wasi::http::types::{Fields, OutgoingBody, OutgoingResponse},
+    wasi::io::streams::StreamError,
 };
 use bindings::wasi::http::outgoing_handler::{handle, OutgoingRequest};
 const HOME: &[u8] = b"
 <html>
-<head>
-    <title>Example page</title>
-    </head>
+<head><title>Example page</title></head>
     <body>
     <script type=\"module\">
       async function getIssues() {
-        let res = await fetch(\"/_/gh\");
+        let res = await fetch(\"/gh\");
         return res;
       }
       let issuesRes = await getIssues();
@@ -52,12 +51,11 @@ const ISSUE: &[u8] = b"
     <script type=\"module\">
       const urlParams = new URLSearchParams(window.location.search);
       async function getIssue() {
-        let res = await fetch(`/_/gh/issue?${urlParams.toString()}`);
+        let res = await fetch(`/gh/issue?${urlParams.toString()}`);
         return res;
       }
       let issuesRes = await getIssue();
       let issue = await issuesRes.json();
-      console.log({issue})
       let h1 = document.createElement(\"h1\");
       h1.textContent = issue.title;
       document.body.appendChild(h1);
@@ -80,19 +78,18 @@ const CREATE: &[u8] = b"
       const urlParams = new URLSearchParams(window.location.search);
       const form = document.getElementById(\"form\");
       async function submitHandler(e) {
-        console.log({e})
         const data = new FormData(e.target);
         e.preventDefault()
-        const [[_title, title], [_repo, repo], [_owner, owner], [_body, body]] = [...data.entries()]
-        console.log([...data.entries()])
-        let res = await fetch(`/_/gh/create?}`, {
+        const body = JSON.stringify({
+          title: data.get('title'),
+          repo: data.get('repo'),
+          owner: data.get('owner'),
+          body: data.get('body'),
+        });
+        let res = await fetch(`/gh/create`, {
           method: \"POST\",
-          body: JSON.stringify({
-            title,
-            body,
-            repo,
-            owner
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body,
         });
         return res;
       }
@@ -145,7 +142,6 @@ struct ReqBody {
 impl Guest for Component {
     fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
         let path = request.path_with_query().unwrap();
-        dbg!(&path);
         if path.starts_with("/create") {
             let hdrs = Fields::new();
             let resp = OutgoingResponse::new(hdrs);
@@ -197,11 +193,8 @@ impl Guest for Component {
             req.set_scheme(Some(&Scheme::Https)).unwrap();
             req.set_path_with_query(Some("/issues")).unwrap();
             req.set_authority(Some("api.github.com")).unwrap();
-            let future_res =
-                handle(req, None).map_err(|err| anyhow::anyhow!("outgoing error code: {err}"));
-            let future_res = future_res.unwrap();
-            let future_res_pollable = future_res.subscribe();
-            future_res_pollable.block();
+            let future_res = handle(req, None).expect("future response");
+            future_res.subscribe().block();
 
             let res = future_res
                 .get()
@@ -251,7 +244,6 @@ impl Guest for Component {
             let pieces = path.split("?");
             let param_string = pieces.last().unwrap();
             let params: Params = serde_qs::from_str(param_string).unwrap();
-            dbg!(&params);
 
             req.set_path_with_query(Some(&format!(
                 "/repos/{}/{}/issues/{}",
@@ -289,16 +281,20 @@ impl Guest for Component {
             let wasm_body = request.consume().unwrap();
             let wasm_stream = wasm_body.stream().unwrap();
             let mut bytes = Vec::new();
-            let mut more_bytes = true;
-            while more_bytes {
-                if let Ok(new_bytes) = wasm_stream.blocking_read(10000000000000000000) {
-                    bytes.extend(new_bytes);
-                } else {
-                    more_bytes = false;
+            loop {
+                match wasm_stream.blocking_read(10000000000000000000) {
+                    Ok(mut b) => {
+                        bytes.append(&mut b);
+                    }
+                    Err(StreamError::Closed) => {
+                        break;
+                    }
+                    Err(err) => {
+                        dbg!(err);
+                    }
                 }
             }
-            let issue = serde_json::from_slice::<CreateRequest>(&bytes).unwrap();
-            dbg!(&issue);
+            let issue = serde_json::from_slice::<CreateRequest>(&bytes).expect("valid JSON");
             let fields = Fields::new();
             fields
                 .set(
@@ -345,12 +341,19 @@ impl Guest for Component {
                 handle(req, None).map_err(|err| anyhow::anyhow!("outgoing error code: {err}"));
             let future_res = future_res.unwrap();
             let future_res_pollable = future_res.subscribe();
+            drop(stream);
+            OutgoingBody::finish(body, None).unwrap();
             future_res_pollable.block();
 
             let res = future_res.get();
             // .map_err(|err| anyhow::anyhow!("outgoing response error code: {err:?}"));
-            dbg!(&res);
-            let res = res.unwrap().unwrap().unwrap();
+            let res = match res.unwrap().unwrap() {
+                Ok(res) => res,
+                Err(err) => {
+                    dbg!(err);
+                    panic!("error http outgoing");
+                }
+            };
             let body = res.consume().unwrap();
             let stream = body.stream().unwrap();
             let bytes = &stream.blocking_read(100000000000).unwrap();
