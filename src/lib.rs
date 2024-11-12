@@ -10,6 +10,9 @@ use crate::bindings::{
     wasi::io::streams::StreamError,
 };
 use bindings::wasi::http::outgoing_handler::{handle, OutgoingRequest};
+
+const TOKEN: &[u8] = b"Bearer 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";
+
 const HOME: &[u8] = b"
 <html>
 <head>
@@ -26,12 +29,7 @@ const HOME: &[u8] = b"
   },
   }
 </script>
-<style>
-  body a {
-    color: #7dd3fc;
-  }
-</style>
-<title>Issue Manager</title></head>
+<title>GitHub Issue Manager</title></head>
     <body class=\"bg-slate-900 text-white p-5\">
     <script type=\"module\">
       async function getIssues() {
@@ -40,24 +38,25 @@ const HOME: &[u8] = b"
       }
       let issuesRes = await getIssues();
       let issues = await issuesRes.json();
-      console.log()
 
-      let ol = document.createElement(\"ol\");
+      let ul = document.createElement(\"ul\");
+      ul.classList.add('mt-5', 'list-disc', 'pl-5');
       for (const issue of issues) {
         let li = document.createElement(\"li\");
         let a = document.createElement(\"a\");
+        a.classList.add(\"underline\", \"decoration-sky-500\", \"decoration-solid\", \"decoration-2\", 'text-slate-200', 'hover:text-white');
         li.appendChild(a);
         const linkText = document.createTextNode(issue.title);
         a.appendChild(linkText);
-        a.href = `/issue?owner=JAFLabs&repo=issues&number=${issue.number}`;
-        ol.appendChild(li);
+        a.href = `/issue?owner=calvinrp&repo=WasmCon-issues-demo&number=${issue.number}`;
+        ul.appendChild(li);
       }
-      document.body.appendChild(ol);
+      document.body.appendChild(ul);
 
     </script>
-    <h1>Issue Manager</h1>
-    <a href=\"/create\">Create an Issue</a>
-    </div>
+    <h1 class=\"text-3xl text-slate-100 font-black mb-10\">GitHub Issue Manager</h1>
+    <a href=\"/create\" class=\"inline-block py-2 px-3 bg-slate-800 rounded-lg text-slate-200 hover:text-white hover:bg-slate-700\">Create an Issue</a>
+    <h4 class=\"text-lg text-slate-300 font-semibold mb-5 mt-10\">Open Issues:</h4>
     </body>
     </html>
     ";
@@ -78,44 +77,38 @@ const ISSUE: &[u8] = b"
   },
   }
 </script>
-<style>
-  body a {
-    color: #7dd3fc;
-  }
-</style>
-    <title>Issue</title>
+<title></title>
     </head>
     <body class=\"bg-slate-900 text-white p-5\">
-    <script src=\"https://cdn.jsdelivr.net/npm/marked/marked.min.js\"></script>
-
-    <script type=\"module\">
-      const urlParams = new URLSearchParams(window.location.search);
-      async function getIssue() {
-        let res = await fetch(`/gh/issue?${urlParams.toString()}`);
-        return res;
-      }
-      let issuesRes = await getIssue();
-      let issue = await issuesRes.json();
-      let h1 = document.createElement(\"h1\");
-      h1.textContent = issue.title;
-      document.body.appendChild(h1);
-      let issueBody = document.createElement(\"div\");
-      // issueBody.setAttribute(\"markdown\", \"1\");
-      issueBody.innerHTML = issue.body;
-      // issueBody.appendChild(issueText);
-
-      console.log(marked.parse(issue.body))
-
-      document.body.appendChild(issueBody);
-    </script>
-<div>
+<h1 class=\"text-3xl text-slate-100 font-black mb-10\" id=\"issue-title\"></h1>
+<div class=\"text-slate-300 bg-slate-800 rounded p-3 inline-block\" id=\"issue-body\">
 </div>
+<div class=\"mt-10\">
+<a href=\"/\" class=\"underline decoration-sky-500 decoration-solid decoration-2 text-slate-200 hover:text-white\">Back to issue list</a>
+</div>
+<script type=\"module\">
+  const urlParams = new URLSearchParams(window.location.search);
+  async function getIssue() {
+    let res = await fetch(`/gh/issue?${urlParams.toString()}`);
+    return res;
+  }
+  const issuesRes = await getIssue();
+  const issue = await issuesRes.json();
+  
+  const h1 = document.getElementById('issue-title');
+  h1.textContent = issue.title;
+  document.title = issue.title;
+
+  const issueBody = document.getElementById('issue-body');
+  issueBody.setHTMLUnsafe(issue.body);
+</script>
 </body>
 </html>";
 
 const CREATE: &[u8] = b"
 <html>
 <head>
+<title>Create new issue</title>
 <script src=\"https://cdn.tailwindcss.com\">
 </script>
 <script>
@@ -129,74 +122,46 @@ const CREATE: &[u8] = b"
   },
   }
 </script>
-<style>
-  body a {
-    color: #7dd3fc;
-  }
-
-  body form {
-    border-radius: .5rem;
-    background-color: #1e293b;
-  }
-  body input {
-    border-radius: .5rem;
-    background-color: #334155;
-  }
-  body textarea {
-    border-radius: .5rem;
-    background-color: #334155;
-    box-sizing: border-box;
-  }
-</style>
-    <title>Create an issue</title>
-    </head>
+</head>
     <body class=\"bg-slate-900 text-white p-5\">
     <script type=\"module\">
       const urlParams = new URLSearchParams(window.location.search);
       const form = document.getElementById(\"form\");
       async function submitHandler(e) {
-        console.log(\"SUBMITTING\");
         const data = new FormData(e.target);
         e.preventDefault()
         const body = JSON.stringify({
           title: data.get('title'),
           body: data.get('body'),
         });
-        console.log({body})
         let res = await fetch(`/gh/create`, {
           method: \"POST\",
           headers: { 'Content-Type': 'application/json' },
           body,
         });
         let resBody = await res.json();
-        console.log({resBody})
-        let success = document.createElement(\"a\");
-        const linkText = document.createTextNode(\"Successfully created issue\");
-        success.appendChild(linkText);
-        success.href = resBody.html_url;
-        document.body.appendChild(success);
-        console.log({resBody})
 
-        return res;
+        window.location.pathname = '/';
       }
       form.addEventListener(\"submit\", submitHandler);
     </script>
-<div>
+<h1 class=\"text-3xl text-slate-100 font-black mb-10\">Create new issue</h1>
+<div class=\"mb-10\">
 <form id=\"form\">
   <label for=\"title\">Issue Title</label>
-  <div>
-  <input type=\"text\" id=\"title\" name=\"title\"><br><br>
+  <div class=\"mb-3 mt-1\">
+      <input type=\"text\" id=\"title\" name=\"title\" class=\"bg-slate-700 text-slate-100 py-2 px-3 rounded\">
   </div>
   <label for=\"body\">Issue Body</label>
-  <div>
-  <textarea id=\"issue-body\" name=\"body\", rows=\"4\" cols=\"50\">Write your issue here</textarea>
+  <div class=\"mt-1\">
+  <textarea id=\"issue-body\" name=\"body\", rows=\"4\" cols=\"50\" class=\"bg-slate-700 text-slate-100 py-2 px-3 rounded\">Write your issue here</textarea>
   </div>
-  <div>
-  <input  type=\"submit\" value=\"Submit\">
+  <div class=\"mt-5\">
+   <input type=\"submit\" value=\"Submit\" class=\"cursor-pointer inline-block py-2 px-3 bg-slate-800 rounded-lg text-slate-200 hover:text-white hover:bg-slate-700\" />
   </div>
 </form>
 </div>
-<a href=\"/\">Back to issue list</a>
+<a href=\"/\" class=\"underline decoration-sky-500 decoration-solid decoration-2 text-slate-200 hover:text-white\">Back to issue list</a>
 </body>
 </html>";
 
@@ -264,8 +229,7 @@ impl Guest for Component {
             fields
                 .set(
                     &String::from("Authorization"),
-                    &["Bearer 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"
-                        .as_bytes()
+                    &[TOKEN
                         .to_vec()],
                 )
                 .unwrap();
@@ -278,7 +242,7 @@ impl Guest for Component {
             let req = OutgoingRequest::new(fields);
             req.set_method(&Method::Get).unwrap();
             req.set_scheme(Some(&Scheme::Https)).unwrap();
-            req.set_path_with_query(Some(&format!("/repos/JAFLabs/issues/issues")))
+            req.set_path_with_query(Some(&format!("/repos/calvinrp/WasmCon-issues-demo/issues")))
                 .unwrap();
             req.set_authority(Some("api.github.com")).unwrap();
             let future_res = handle(req, None).expect("future response");
@@ -315,8 +279,7 @@ impl Guest for Component {
             fields
                 .set(
                     &String::from("Authorization"),
-                    &["Bearer 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"
-                        .as_bytes()
+                    &[TOKEN
                         .to_vec()],
                 )
                 .unwrap();
@@ -383,7 +346,6 @@ impl Guest for Component {
                 }
             }
             let issue = serde_json::from_slice::<CreateRequest>(&bytes).expect("valid JSON");
-            dbg!(&issue);
             let fields = Fields::new();
             fields
                 .set(
@@ -394,8 +356,7 @@ impl Guest for Component {
             fields
                 .set(
                     &String::from("Authorization"),
-                    &["Bearer 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"
-                        .as_bytes()
+                    &[TOKEN
                         .to_vec()],
                 )
                 .unwrap();
@@ -411,7 +372,7 @@ impl Guest for Component {
             let req = OutgoingRequest::new(fields);
             req.set_method(&Method::Post).unwrap();
             req.set_scheme(Some(&Scheme::Https)).unwrap();
-            req.set_path_with_query(Some(&format!("/repos/JAFLabs/issues/issues",)))
+            req.set_path_with_query(Some(&format!("/repos/calvinrp/WasmCon-issues-demo/issues",)))
                 .unwrap();
             req.set_authority(Some("api.github.com")).unwrap();
             let body = req.body().unwrap();
@@ -422,7 +383,6 @@ impl Guest for Component {
                 title: issue.title,
                 body: issue_body,
             };
-            dbg!(&to_write);
             stream
                 .blocking_write_and_flush(serde_json::to_string(&to_write).unwrap().as_bytes())
                 .unwrap();
